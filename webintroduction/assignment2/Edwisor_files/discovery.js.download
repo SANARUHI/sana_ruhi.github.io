@@ -1,0 +1,39 @@
+let getDomain = () => {
+    let hostName = window.location.host.split('.')
+    if (hostName[1] === 'testedwisor') {
+        return 'testedwisor';
+    } else if (hostName[1] === 'edwisor') {
+        return 'edwisor';
+    } else {
+        return 'testedwisor';
+    }
+
+}
+
+let domainName = getDomain();
+
+// console.log(domainName);
+
+var userGateway = `https://gateways.${domainName}.com/user-gateway`;
+
+var apiVersion = `api/v1`;
+
+var webUrl = `https://${domainName}.com`;
+
+var accountsFrontendUrl = `https://accounts.${domainName}.com`;
+
+var learningFrontendUrl = `https://learning.${domainName}.com`;
+
+var learningGateway = `https://gateways.${domainName}.com/learning-gateway`;
+
+var mcqManageGateway = `https://gateways.${domainName}.com/mcq-manage-gateway`;
+
+var codingManageGateway = `https://gateways.${domainName}.com/coding-manage-gateway`;
+
+var gatewayUrl = `https://gateways.${domainName}.com`;
+
+var profileFrontendUrl = `https://profile.${domainName}.com`;
+
+var getDomainName = `https://${domainName}.com`;
+
+var imagesBaseUrl = `https://s3-ap-southeast-1.amazonaws.com/edwisor-india-bucket`;

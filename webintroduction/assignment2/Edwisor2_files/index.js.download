@@ -1,0 +1,1102 @@
+let testId = '';
+let userId = '';
+let compilerTestName;
+let testNumber = '1';
+let currentFileName = '';
+let testAppRoute = '';
+let testResult;
+let hintObject;
+let userDifficultyLevel;
+
+let optionsLeft = []
+
+
+let currentQuestionId;
+let currentQuestion;
+
+let edauthtoken;
+let edsecuretoken;
+let deductionMarks = 0;
+
+$(document).ready(() => {
+
+    edauthtoken = Cookies.get('edauthtoken');
+    edsecuretoken = Cookies.get('edsecuretoken');
+
+    // console.log("hii");
+
+    if (edauthtoken && edsecuretoken) {
+
+        getUserDetails();
+
+    } else {
+
+        window.open(accountsFrontendUrl, '_self');
+
+    }
+
+})
+
+
+// function to get query params.
+let getUrlParams = (name) => {
+
+    name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+
+    var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+
+    var results = regex.exec(location.search);
+
+    return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+
+};
+
+let getUserDetails = () => {
+
+    $.ajax({
+        type: 'GET',
+        dataType: 'json',
+        async: true,
+        headers: {
+            "Content-type": "application/x-www-form-urlencoded",
+            "edauthtoken": edauthtoken,
+            "edsecuretoken": edsecuretoken
+        },
+        url: `${userGateway}/${apiVersion}/user/userdetails`,
+
+        success: (response) => {
+
+            if (response["status"] == 200) {
+
+                loggedInUserInfo = response["data"];
+
+                $('.userName').text(loggedInUserInfo.firstName + " " + loggedInUserInfo.lastName);
+
+                if (loggedInUserInfo.profilePhoto.length > 0) {
+
+                    // $('.userImage').html(`<img src="${loggedInUserInfo.profilePhoto[0]}" class="responsive-img circle userProfileImageCircle">`);
+
+                    $('.userImage').attr("src", loggedInUserInfo.profilePhoto[0]);
+
+                } else {}
+
+                localStorage.setItem('userInfo', JSON.stringify(loggedInUserInfo));
+
+                testId = getUrlParams('testId');
+
+                if (testId == '') {
+
+                    window.open('message-code.html?url=testNotFound','_self');
+
+                } else {
+
+                    getTimeLeftC(testId);
+
+                }
+
+            } else {
+
+                // console.log("data status is not 200");
+
+                window.open(accountsFrontendUrl, '_self');
+
+            }
+
+        },
+        error: (err) => {
+
+            // console.log("Some error occured, Please try again later");
+
+            // console.log(err);
+
+            window.open(accountsFrontendUrl, '_self');
+
+        }
+
+    });
+
+}
+
+let inputLoadFunction = () => {
+
+    $(".myInput").on('click', function () {
+        // console.log("click called")
+        if (this.checked) {
+            optionsLeft.push(this.id)
+            // console.log(optionsLeft)
+        } else {
+            let index = optionsLeft.indexOf(this.id)
+            optionsLeft.splice(index, 1)
+            // console.log(optionsLeft)
+
+        }
+    });
+}
+
+let getTimeLeftC = (testId) => {
+
+    // console.log(testId);
+
+    $.ajax(codingManageGateway + '/' + apiVersion + '/studenttest/get/time/left/' + testId, // request url
+        {
+            success: function (data, status, xhr) { // success callback function
+                // console.log("test data success")
+                // console.log(data)
+
+                if (data.status == 200) {
+
+                    if (data.data.minutesLeft > 0) {
+
+                        $("#future_date2").countdowntimer({
+                            startDate: data.data.currentTime,
+                            dateAndTime: data.data.endTime,
+                            size: "lg",
+                            expiryUrl: `/message-code.html?url=timeUpC&testId=${testId}`
+                        });
+
+                        loadTestDetailsC(testId);
+
+                    } else {
+
+                        // window.location.href = `/message-code.html?url=testEnded&testId=${testId}`;
+                        window.location.href = `/message-code.html?url=timeUpC&testId=${testId}`;
+
+                    }
+
+                } else if(data.status == 403){
+
+                    // window.location.href = `/message-code.html?url=testEnded&testId=${testId}`;
+                    window.location.href = `/message-code.html?url=timeUpC&testId=${testId}`;
+                    
+                } else {
+
+                    window.location.href = `/message-code.html?url=wrongResponse&testId=${testId}`;
+
+                }
+
+            },
+            error: function (jqXhr, textStatus, errorMessage) { // error callback 
+                // console.log("error")
+                // console.log(errorMessage)
+
+                M.toast({
+                    html: 'Some error occured, please try again later'
+                })
+            }
+        });
+
+
+} // end load test details
+
+let loadTestDetailsC = (testId) => {
+
+    $.ajax(codingManageGateway + '/' + apiVersion + '/studenttest/' + testId, // request url
+        {
+            success: function (data, status, xhr) { // success callback function
+
+                // console.log(data);
+
+                localStorage.setItem('loadTestDetailsC', JSON.stringify(data.data));
+
+                localStorage.setItem('userLevelId',data.data.userLevelId);
+
+                if (data.status == 200) {
+
+                    if (data.data.status == 'passed') {
+
+                        window.location.href = `/message-code.html?url=success&testId=${testId}`;
+
+                    } else if (data.data.status == 'failed') {
+
+                        window.location.href = `/message-code.html?url=failedC&testId=${testId}`;
+
+                    } else {
+
+                        compilerTestName = data.data.testName;
+
+                        userId = data.data.userId;
+
+                        testAppRoute = data.data.testAppRoute;
+
+                        // getTheQuestionC(testId);
+                        // getFileList();
+                        getFileList(data.data.difficultyLevel);
+
+                    }
+
+                } else {
+
+                    // console.log('status not 200');
+
+                }
+
+            },
+            error: function (jqXhr, textStatus, errorMessage) { // error callback 
+                // console.log("error")
+                // console.log(errorMessage)
+            }
+        });
+
+
+} // end load test details
+
+let getFileList = (difficultyLevel) => {
+
+    userDifficultyLevel = difficultyLevel;
+
+    $.ajax({
+        type: 'GET',
+        url: gatewayUrl + testAppRoute + '/' + apiVersion + `/list-directory?userName=${userId}&testName=${compilerTestName}&difficultyLevel=${difficultyLevel}`,
+        contentType: "application/x-www-form-urlencoded",
+        success: function (data) {
+
+            // console.log(data)
+
+            if (data.statusCode == 200) {
+
+                let allFiles = data.body;
+
+                // console.log(allFiles[0].name, difficultyLevel);
+
+                getFileData(allFiles[0].name, difficultyLevel);
+
+                for (item of allFiles) {
+
+                    $('.innerFileList').append(`<li title="${item.name}" class="truncate" onclick="getFileData('${item.name}', '${difficultyLevel}')">
+                        <img src="./src/assets/images/icons/file.png" class="responsive-img"> ${item.name}
+                    </li>`)
+                }
+
+            } else {
+
+                window.location.href = `/message-code.html?url=serverError&testId=${testId}`;
+
+            }
+
+        },
+        error: function (jqXhr, textStatus, errorMessage) {
+            // console.log("error")
+            // console.log(errorMessage)
+
+            window.location.href = `/message-code.html?url=serverError&testId=${testId}`;
+        }
+    });
+
+}
+
+let getFileData = (fileName, difficultyLevel) => {
+
+    $('#currentFileName').text(fileName);
+
+    // currentFileName = fileName.slice(0, fileName.length - 3);
+
+    // console.log(currentFileName);
+
+    currentFileName = fileName.slice(0, fileName.lastIndexOf('.'));
+
+    fileNameExt = fileName.slice(fileName.lastIndexOf('.'), fileName.length);
+
+    // console.log(currentFileName);
+
+    // console.log(fileNameExt);
+
+    if (fileNameExt === '.js') {
+
+        editor.session.setMode("ace/mode/javascript");
+
+    } else if (fileNameExt === '.html') {
+
+        editor.session.setMode("ace/mode/html");
+
+    } else if (fileNameExt === '.json') {
+
+        editor.session.setMode("ace/mode/json");
+
+    } else if (fileNameExt === '.css') {
+
+        editor.session.setMode("ace/mode/css");
+
+    } else {
+
+        editor.session.setMode("ace/mode/javascript");
+    }
+
+    // console.log(userDifficultyLevel);
+
+    // console.log(gatewayUrl + testAppRoute + '/' + apiVersion + `/list-file?userName=${userId}&testName=${compilerTestName}&difficultyLevel=${userDifficultyLevel}&fileName=${currentFileName}&fileExtension=${fileNameExt}`);
+
+    $.ajax({
+        type: 'GET',
+        url: gatewayUrl + testAppRoute + '/' + apiVersion + `/list-file?userName=${userId}&testName=${compilerTestName}&difficultyLevel=${userDifficultyLevel}&fileName=${currentFileName}&fileExtension=${fileNameExt}`,
+        contentType: "application/x-www-form-urlencoded",
+        success: function (data) {
+
+            // console.log(data)
+
+            $('#testDetails').show();
+
+            $('#testLoading').hide();
+
+            if (data.statusCode == 200) {
+
+                // $('#editor').text(data.body);
+                editor.setValue(data.body);
+
+                $('.submitBar').show();
+
+
+            } else {
+
+                // window.location.href = `/message-code.html?url=serverError&studentTestId=${testId}&testType=coding`;
+
+            }
+
+        },
+        error: function (jqXhr, textStatus, errorMessage) {
+            // console.log("error")
+            // console.log(errorMessage)
+
+            // window.location.href = `/message-code.html?url=serverError&studentTestId=${testId}&testType=coding`;
+        }
+    });
+
+} // end getFileData
+
+let toggleHints = () => {
+
+    // let hints = editor.getSession().getAnnotations();
+
+    $('.hintsDetailsBox').text('');
+
+    $.ajax({
+        type: 'GET',
+        url: codingManageGateway + '/' + apiVersion + `/hint/get/list/to/choose?studentTestId=${testId}`,
+        contentType: "application/x-www-form-urlencoded",
+        success: function (data) {
+
+            if (data.status == 200) {
+
+                // console.log(data);
+
+                $('.hintsDetailsBox').text('');
+
+                hintsList = data.data.hintsList;
+
+                for (hint in hintsList) {
+                    $('.hintsDetailsBox').append(`
+                    <div onclick="checkValidityHint('${hintsList[hint].usedStatus}', '${hintsList[hint].hintObjectId}', '${hintsList[hint].minusScore}')" style="margin-bottom:1em;display:flex; border:1px solid #ddd;border-radius:0.5em;cursor:pointer;padding:0.5em;"">
+                        <div style="width:100%;">
+                            Hint ${parseInt(hint) + 1} : will cost you ${hintsList[hint].minusScore} points.
+                        </div>
+                    </div>
+                `);
+                }
+
+            } else {
+
+                M.toast({
+                    html: 'No Hints Found'
+                })
+            }
+
+            // $('.hintsDetailsBox').append(`<span class="cursorPointer" onclick="showWarningModal('some content')">hint details</span>`);
+
+        },
+        error: function (jqXhr, textStatus, errorMessage) {
+
+            // console.log("error")
+            // console.log(errorMessage)
+        }
+    });
+
+    $('.hintsDetailsBox').toggle();
+
+}
+
+let checkValidityHint = (usedStatus, hintObjectId, minusScore) => {
+
+    // console.log(usedStatus);
+
+    if (usedStatus == 'true') {
+
+        getUsedHints(hintObjectId);
+        
+    } else if (usedStatus == 'false') {
+
+        // console.log("in false");
+
+        hintObject = hintObjectId;
+
+        showWarningModal(`This hint will costs you ${minusScore} number deduction in your skill score.`);
+
+    } else {
+
+    }
+
+}
+
+let getUsedHints = (hintObjectId) => {
+
+    $('#useHintConfirmation').hide();
+
+    $.ajax({
+        type: 'GET',
+        url: codingManageGateway + '/' + apiVersion + `/hint/get/used/hint?studentTestId=${testId}&hintObjectId=${hintObjectId}`,
+        contentType: "application/x-www-form-urlencoded",
+        success: function (data) {
+
+            // console.log(data);
+
+            let elem = document.querySelector('.hintWarningModal');
+            let instance = M.Modal.getInstance(elem);
+            instance.open();
+
+            let hintsArray = data.data.hintObject.hintString.split('\n');
+
+            // console.log(hintsArray);
+
+            $('#hintValue').text('');
+            
+            for(i=0;i<hintsArray.length;i++){
+
+                var x = document.createElement("SPAN");
+                var t = document.createTextNode(`${hintsArray[i]}`);
+                x.appendChild(t);
+                document.body.appendChild(x);
+
+                $('#hintValue').append(x);
+
+                $('#hintValue').append(`
+                    <br/>
+                `);
+            }
+
+            $('#hintValue').append('<br>');
+            $('#hintValue').append('<div class="center"><button class="grayBrdrBtn" onclick="closeHintWarningModal()">OK</button></div>');
+
+            $('#hintWaitingLoader').css('display', 'none');
+
+            $('#hintValue').css('display', 'block');
+
+        },
+        error: function (jqXhr, textStatus, errorMessage) {
+
+            // console.log("error")
+            // console.log(errorMessage)
+        }
+    });
+
+}
+
+let showWarningModal = (content) => {
+
+    $('#hintValue').text('');
+
+    $('#minusSkillScore').text(content);
+
+    // console.log(content);
+
+    let elem = document.querySelector('.hintWarningModal');
+    let instance = M.Modal.getInstance(elem);
+    instance.open();
+
+}
+
+let closeHintWarningModal = () => {
+
+    $('#useHintConfirmation').show();
+
+    $('#hintValue').hide();
+
+    let elem = document.querySelector('.hintWarningModal');
+    let instance = M.Modal.getInstance(elem);
+    instance.close();
+
+}
+
+let getHintsText = () => {
+
+    $('#useHintConfirmation').hide();
+
+    $('#hintWaitingLoader').css('display', 'block');
+
+
+    let params = {
+        'studentTestId': testId,
+        'hintObjectId': hintObject
+    }
+
+    $.ajax({
+        type: 'POST',
+        url: codingManageGateway + '/' + apiVersion + `/hint/set/used/hint`,
+        contentType: "application/x-www-form-urlencoded",
+        data: params,
+        success: function (data) {
+
+            // console.log(data);
+
+            $('#hintWaitingLoader').css('display', 'none');
+
+            $('#hintValue').css('display', 'block');
+
+            let hintsArray = data.data.hintObject.hintString.split('\n');
+
+            // console.log(hintsArray);
+
+            
+            for(i=0;i<hintsArray.length;i++){
+
+                var x = document.createElement("SPAN");
+                var t = document.createTextNode(`${hintsArray[i]}`);
+                x.appendChild(t);
+                document.body.appendChild(x);
+
+                $('#hintValue').append(x);
+
+                $('#hintValue').append(`
+                    <br/>
+                `);
+
+            }
+
+            $('#hintValue').append('<br>');
+            $('#hintValue').append('<br>');
+            $('#hintValue').append('<div class="center"><button class="grayBrdrBtn" onclick="closeHintWarningModal()">OK</button></div>');
+
+            toggleHints();
+
+        },
+        error: function (jqXhr, textStatus, errorMessage) {
+
+            // console.log("error")
+            // console.log(errorMessage)
+        }
+    });
+
+}
+
+let writeFileData = (userCode) => {
+
+    // console.log(editor.getSession().getAnnotations());
+
+    if (editor.getSession().getAnnotations().length > 0) {
+        M.toast({
+            html: 'Please resolve the syntax errors using left side numeric bar'
+        });
+    } else {
+
+        let elem = document.querySelector('.loaderModal');
+        let instance = M.Modal.getInstance(elem);
+        instance.open();
+
+        $.ajax({
+            type: 'POST',
+            url: gatewayUrl + testAppRoute + '/' + apiVersion + `/write-file?userName=${userId}&testName=${compilerTestName}&fileName=${currentFileName}&difficultyLevel=${userDifficultyLevel}`,
+            contentType: "text/plain",
+            data: userCode,
+            success: function (data) {
+
+                instance.close();
+
+                // console.log(data)
+
+                if (data.statusCode == 200) {
+
+                    M.toast({
+                        html: 'File saved successfully'
+                    })
+
+                } else {
+
+                    // window.location.href = `/message-code.html?url=serverError&studentTestId=${testId}&testType=coding`;
+
+                    // console.log('some error');
+
+                }
+
+            },
+            error: function (jqXhr, textStatus, errorMessage) {
+
+                instance.close();
+
+                // console.log("error")
+                // console.log(errorMessage)
+
+                // window.location.href = `/message-code.html?url=serverError&studentTestId=${testId}&testType=coding`;
+            }
+        });
+
+    }
+
+} // end writeFileData
+
+let runTest = (userCode) => {
+
+    if (editor.getSession().getAnnotations().length > 0) {
+        M.toast({
+            html: 'Please resolve the syntax errors using left side numeric bar'
+        });
+
+        let elemConf = document.querySelector('.confirmationModal');
+        let instanceConf = M.Modal.getInstance(elemConf);
+        instanceConf.close();
+
+    } else {
+
+        let elemConf = document.querySelector('.confirmationModal');
+        let instanceConf = M.Modal.getInstance(elemConf);
+        instanceConf.close();
+
+        let elem = document.querySelector('.loaderModal');
+        let instance = M.Modal.getInstance(elem);
+        instance.open();
+
+        $.ajax({
+            type: 'POST',
+            url: gatewayUrl + testAppRoute + '/' + apiVersion + `/write-file?userName=${userId}&testName=${compilerTestName}&fileName=${currentFileName}&difficultyLevel=${userDifficultyLevel}`,
+            contentType: "text/plain",
+            data: userCode,
+            success: function (data) {
+
+                instance.close();
+
+                // console.log(data)
+
+                if (data.statusCode == 200) {
+
+                    checkTest(userCode);
+
+                } else {
+
+                    // window.location.href = `/message-code.html?url=serverError&studentTestId=${testId}&testType=coding`;
+
+                    // console.log('some error');
+
+                }
+
+            },
+            error: function (jqXhr, textStatus, errorMessage) {
+
+                instanceConf.close();
+
+                instance.close();
+
+                // console.log("error")
+                // console.log(errorMessage)
+
+                // window.location.href = `/message-code.html?url=serverError&studentTestId=${testId}&testType=coding`;
+            }
+        });
+
+    }
+
+
+}
+
+let checkTest = (userCode) => {
+
+    let elem2 = document.querySelector('.submittingModal');
+    let instance2 = M.Modal.getInstance(elem2);
+    instance2.open();
+
+    $.ajax({
+        type: 'POST',
+        url: gatewayUrl + testAppRoute + '/' + apiVersion + `/run-test?userName=${userId}&difficultyLevel=${userDifficultyLevel}&testName=${compilerTestName}`,
+        // url: codingManageGateway + '/' + apiVersion + `/studenttest/submit?userId=${userId}&studentTestId=${testId}`,
+        contentType: "text/plain",
+        data: userCode,
+        success: function (data) {
+
+            instance2.close();
+
+            // console.log(data);
+
+            if (data.status == 200) {
+
+                if(data.data.total == data.data.passed && data.data.total != 0){
+
+                    submitTest(userCode);
+
+                } else{
+
+                    M.toast({
+                        html: 'Please check your code as there seems to be a logical error \n make sure you follow the problem statement correctly'
+                    })
+
+                }
+
+                // testResult = data.data;
+
+                // let userTestDetails = JSON.parse(localStorage.getItem('loadTestDetailsC'));
+
+                // localStorage.setItem('userLevelId',userTestDetails.userLevelId);
+
+                // localStorage.setItem('testResult', JSON.stringify(testResult));
+
+            } else {
+
+                M.toast({
+                    html: 'Somethings are still missing, please try to complete the code.'
+                })
+
+            }
+
+        },
+        error: function (jqXhr, textStatus, errorMessage) {
+            instance2.close();
+
+            // console.log("error")
+            // console.log(errorMessage)
+
+            // window.location.href = `/message-code.html?url=serverError&studentTestId=${testId}&testType=coding`;
+        }
+    });
+
+}
+
+let submitTest = (userCode) => {
+
+    if (editor.getSession().getAnnotations().length > 0) {
+        M.toast({
+            html: 'Please resolve the syntax errors using left side numeric bar'
+        });
+    } else {
+
+        let elemConf = document.querySelector('.confirmationModal');
+        let instanceConf = M.Modal.getInstance(elemConf);
+        instanceConf.close();
+
+        let elem2 = document.querySelector('.submittingModal');
+        let instance2 = M.Modal.getInstance(elem2);
+        instance2.open();
+
+        $.ajax({
+            type: 'POST',
+            // url: gatewayUrl + testAppRoute + '/' + apiVersion + `/run-test?userName=${userId}&testName=${compilerTestName}&fileName=${currentFileName}`,
+            url: codingManageGateway + '/' + apiVersion + `/studenttest/submit?userId=${userId}&studentTestId=${testId}`,
+            contentType: "text/plain",
+            data: userCode,
+            success: function (data) {
+
+                instance2.close();
+
+                // console.log(data);
+
+                if (data.status == 200) {
+
+                    testResult = data.data;
+
+                    let userTestDetails = JSON.parse(localStorage.getItem('loadTestDetailsC'));
+
+                    localStorage.setItem('userLevelId',userTestDetails.userLevelId);
+
+                    localStorage.setItem('testResult', JSON.stringify(testResult));
+
+                    $('#testPassed').css('display', 'none');
+
+                    $('#testFailed').css('display', 'none');
+
+                    window.location.href = `/message-code.html?url=submitCode&testId=${testId}`;
+
+                    // if (data.data.nextTestInfo.attemptStatus == 'optional') {
+
+                    //     // show modal for next test if accept -> hit api for generate test else finish test.
+
+                    //     $('#testPassed').css('display', 'block');
+
+                    //     let elem = document.querySelector('.nextTestWarning');
+                    //     let instance = M.Modal.getInstance(elem);
+                    //     instance.open();
+
+                    // } else if (data.data.nextTestInfo.attemptStatus == 'mandatory') {
+
+                    //     // hitForNextTestApi();
+
+                    //     $('#testFailed').css('display', 'block');
+
+                    //     let elem = document.querySelector('.nextTestWarning');
+                    //     let instance = M.Modal.getInstance(elem);
+                    //     instance.open();
+
+                    // } else {
+
+                    //     window.location.href = `/message-code.html?url=success&testId=${testId}`;
+
+                    // }
+
+                } else {
+
+                    M.toast({
+                        html: 'Somethings are still missing, please try to complete the code.'
+                    })
+
+                }
+
+            },
+            error: function (jqXhr, textStatus, errorMessage) {
+
+                instanceConf.close();
+                instance2.close();
+
+                // console.log("error")
+                // console.log(errorMessage)
+
+                // window.location.href = `/message-code.html?url=serverError&studentTestId=${testId}&testType=coding`;
+            }
+        });
+
+    }
+
+
+}
+
+let hitForNextTestApi = () => {
+
+    closeNextTestWarningModal();
+
+    let param = $.param({
+        'userId': userId,
+        'levelId': testResult.skillLevelId,
+        'userLevelId': testResult.userLevelId,
+        'difficultyLevel': testResult.nextTestInfo.difficultyLevel,
+        'testType': testResult.type
+    });
+
+    $.ajax({
+        type: 'POST',
+        // url: gatewayUrl + testAppRoute + '/' + apiVersion + `/run-test?userName=${userId}&testName=${compilerTestName}&fileName=${currentFileName}`,
+        url: learningGateway + '/' + apiVersion + `/auto-assignment/generate/student/test?userId=${userId}&studentTestId=${testId}`,
+        contentType: "application/x-www-form-urlencoded",
+        data: param,
+        success: function (data) {
+
+            // console.log(data);
+
+            if (data.status == 200) {
+
+                window.open(`?testId=${data.data.studentTestId}`, '_self')
+
+            } else {
+
+                M.toast({
+                    html: 'Some error occured, try again or contact support'
+                });
+
+            }
+
+        },
+        error: function (jqXhr, textStatus, errorMessage) {
+
+            // console.log("error")
+            // console.log(errorMessage)
+
+            M.toast({
+                html: 'Some error occured, try again or contact support'
+            });
+
+            // window.location.href = '/message-code.html?url=500';
+        }
+    });
+
+} // end hitForNextTestApi
+
+
+let closeNextTestWarningModal = () => {
+
+    let elem = document.querySelector('.nextTestWarning');
+    let instance = M.Modal.getInstance(elem);
+    instance.close();
+
+    // window.open(learningFrontendUrl,'_self');
+
+} // end closeNextTestWarningModal
+
+let closeNextTestWarningModalAndGoToLearning = () => {
+
+    let elem = document.querySelector('.nextTestWarning');
+    let instance = M.Modal.getInstance(elem);
+    instance.close();
+
+    window.open(learningFrontendUrl,'_self');
+
+} // end closeNextTestWarningModal
+
+// let getTheQuestionC = (testId) => {
+
+//     // $('.loaderDivision').show();
+//     // $('#questionsDetails').hide();
+
+//     $.ajax(baseUrl + '/studenttest/get/question/random/' + testId, // request url
+//         {
+//             success: function (data, status, xhr) { // success callback function
+//                 console.log(data)
+
+//                 // $('.loaderDivision').hide();
+//                 // $('#questionsDetails').show();
+
+//                 if (data.status == 200) {
+
+//                     currentQuestionId = data.data.questionId;
+//                     currentQuestion = data.data;
+//                     $("#currentQuestion").text(data.data.questionText);
+
+//                     $("#options").text('');
+
+//                     let allAnswers = data.data.answers
+//                     for (item in allAnswers) {
+//                         $("#options").append(`
+//                     "<div class="col s12 m12 l12 padding-t-b-1 white-text">
+//                     <label>
+//                         <input type="checkbox" class="filled-in myInput " id="${allAnswers[item].answerNumber}" />
+//                         <span>&nbsp;</span>
+//                     </label>
+//                     ${allAnswers[item].answerNumber} &nbsp; ${allAnswers[item].answerText}
+
+
+
+//                 </div>`)
+//                     }
+//                     inputLoadFunction()
+
+//                 } else {
+
+//                 }
+
+//             },
+//             error: function (jqXhr, textStatus, errorMessage) {
+
+//                 $('.loaderDivision').hide(); // error callback 
+//                 console.log("error")
+//                 console.log(errorMessage)
+//             }
+//         });
+
+
+// }; //end get test question
+
+// let checkAnswers = () => {
+//     submitAnswerModal();
+//     console.log("checking answer")
+//     let param = $.param({
+//         'answers': optionsLeft.join(",")
+//     })
+//     let checkAnswer = $.ajax({
+//         type: 'POST',
+//         url: baseUrl + "/question/" + currentQuestionId + "/check/answer",
+//         data: param,
+//         contentType: "application/x-www-form-urlencoded",
+//         success: function (resultData) {
+
+//             console.log(resultData)
+//             saveAnswer(testId, resultData.data)
+
+//         },
+//         error: function (jqXhr, textStatus, errorMessage) {
+//             console.log("error")
+//             console.log(errorMessage)
+//         }
+//     });
+
+
+// } // end checkanswer
+
+// let saveAnswer = (testId, isCorrect) => {
+//     console.log("submit answer")
+//     let param = $.param({
+
+//         'questionId': currentQuestionId,
+//         'questionText': currentQuestion.questionText,
+//         'answerGiven': optionsLeft.join(","),
+//         'isCorrect': isCorrect
+//     })
+
+//     let submitAnswers = $.ajax({
+//         type: 'POST',
+//         url: baseUrl + "/studenttest/attempt/question/" + testId,
+//         data: param,
+//         contentType: "application/x-www-form-urlencoded",
+//         success: function (resultData) {
+
+//             let elemSubmit = document.querySelector('.confirmationModal');
+//             let instanceSubmit = M.Modal.getInstance(elemSubmit);
+//             instanceSubmit.close();
+
+//             $('.loaderDivision').show();
+//             $('#questionsDetails').hide();
+
+//             optionsLeft = [];
+
+//             $("#currentQuestion").text('');
+
+//             $("#options").text('');
+
+
+//             console.log(baseUrl + "/studenttest/attempt/question/" + testId);
+//             console.log(resultData)
+
+//             loadTestDetails(testId);
+
+//         },
+//         error: function (jqXhr, textStatus, errorMessage) {
+
+//             let elemSubmit = document.querySelector('.confirmationModal');
+//             let instanceSubmit = M.Modal.getInstance(elemSubmit);
+//             instanceSubmit.close();
+
+
+//             console.log("error")
+//             console.log(errorMessage)
+//         }
+//     });
+
+// }; // end submit answers
+
+let goToDashboard = () => {
+
+    window.open(getDomainName, '_self');
+
+}
+
+let goToProfileSettings = () => {
+
+    window.open(profileFrontendUrl, '_self');
+
+}
+
+let logout = () => {
+
+    $.ajax({
+        type: 'POST',
+        dataType: 'json',
+        async: true,
+        headers: {
+            'Content-type': 'application/x-www-form-urlencoded',
+            edauthtoken: Cookies.get('edauthtoken'),
+            edsecuretoken: Cookies.get('edsecuretoken')
+        },
+        url: `${userGateway}/${apiVersion}/user/logout`,
+
+        success: (response) => {
+
+            Cookies.remove('edauthtoken', '/', 'edwisor.com');
+            Cookies.remove('edsecuretoken', '/', 'edwisor.com');
+
+            localStorage.removeItem('userInfo');
+
+            window.open(accountsFrontendUrl, '_self');
+
+        },
+        error: (err) => {
+
+            Cookies.remove('edauthtoken', '/', 'edwisor.com');
+            Cookies.remove('edsecuretoken', '/', 'edwisor.com');
+
+            localStorage.removeItem('userInfo');
+
+            window.open(accountsFrontendUrl, '_self');
+
+        }
+
+    });
+
+}
